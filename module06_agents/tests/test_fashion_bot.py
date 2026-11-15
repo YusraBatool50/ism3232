@@ -1,13 +1,23 @@
+# test_fashion_bot.py
+
 from fashion_bot import FashionHelper
 from fashion_tool import FashionInventory
+from mock_model import MockModel
+
+
+class SilentModel:
+    """A model that returns no answer."""
+
+    def reply(self, instructions, history):
+        return None
 
 
 def make_helper():
-    """Build a fresh helper with its own tool for each test."""
+    """Build a fresh helper with its own tool and model."""
     inventory = FashionInventory(
         {"heels": "5 pairs available", "jackets": "out of stock"}
     )
-    return FashionHelper("Stella", "Be clear.", inventory)
+    return FashionHelper("Stella", "Be clear.", inventory, MockModel())
 
 
 def test_stock_question_uses_the_tool():
@@ -27,8 +37,14 @@ def test_purchase_request_goes_to_a_human():
 
 
 def test_unknown_request_gets_a_safe_reply():
+    inventory = FashionInventory({"heels": "5 pairs available"})
+    helper = FashionHelper("Stella", "Be clear.", inventory, SilentModel())
+    assert "try again" in helper.respond("What is your favorite color?")
+
+
+def test_other_messages_go_to_the_model():
     helper = make_helper()
-    assert "not sure" in helper.respond("What is your favorite color?")
+    assert helper.respond("hello") == "Hello! How can I help you today?"
 
 
 def test_history_grows_by_two_each_turn():

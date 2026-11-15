@@ -3,27 +3,35 @@
 
 from fashion_bot import FashionHelper
 from fashion_tool import FashionInventory
+from ollama_model import OllamaModel
 
 ITEMS = {
     "heels": "5 pairs available",
-    "dresses": "12 available",
-    "handbags": "3 available",
     "jackets": "out of stock",
+    "dresses": "8 available",
+    "handbags": "3 available",
 }
 
-fashion_inventory = FashionInventory(ITEMS)
+INSTRUCTIONS = """
+You are Stella, a helpful fashion store assistant.
+Answer in one short sentence.
+The store is open Monday through Saturday, 10 AM to 8 PM.
+Customers can try on clothing in the fitting rooms.
+Only state facts provided in these instructions.
+If you do not know an answer, say you do not know
+and suggest speaking to a store associate.
+"""
 
-helper = FashionHelper(
-    "Stella",
-    "You help customers of The Style Edit check fashion item availability.",
-    fashion_inventory,
-)
+inventory = FashionInventory(ITEMS)
+model = OllamaModel("granite4.1:3b")
+
+helper = FashionHelper("Stella", INSTRUCTIONS, inventory, model)
 
 print("Type a message, or type quit to stop.")
 
 user_message = input("You: ")
 
-while user_message != "quit":
+while user_message.lower() != "quit":
     print(f"{helper.name}: {helper.respond(user_message)}")
     user_message = input("You: ")
 
