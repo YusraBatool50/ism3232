@@ -1,47 +1,39 @@
 # fashion_bot.py
 # Author: Yusra Batool
 
-HANDOFF_WORDS = ["buy", "order", "return"]
+HANDOFF_WORDS = ["buy", "purchase", "return", "refund"]
+MAX_TOOL_ROUNDS = 3
 
 
 class FashionHelper:
-    """A fashion assistant using rules and a model."""
+    """A fashion assistant using rules, a model, and checked tools."""
 
-    def __init__(self, name, instructions, fashion_inventory, model):
-        """Set up the helper with its tool, model, and history."""
+    def __init__(self, name, instructions, tools, model):
         self.name = name
         self.instructions = instructions
-        self.fashion_inventory = fashion_inventory
+        self.tools = tools
         self.model = model
         self.history = []
 
     def respond(self, user_message):
         """Record the user message and assistant reply."""
         self.history.append({"role": "user", "content": user_message})
+
         reply = self.choose_reply(user_message)
+
         self.history.append({"role": "assistant", "content": reply})
+
         return reply
 
     def choose_reply(self, user_message):
-        """Use rules first, then ask the model."""
-        text = user_message.lower()
-
-        if self.needs_human(text):
+        """Use handoff rules first, then ask the model."""
+        if self.needs_human(user_message.lower()):
             return (
-                "I can't process orders or returns. Please speak to a store associate."
+                "I can't process purchases or returns. "
+                "Please speak to a store associate."
             )
 
-        if "available" in text or "stock" in text or "have" in text:
-            return self.stock_reply(user_message)
-
         return self.model_reply()
-
-    def model_reply(self):
-        """Ask the model or return a safe reply."""
-        reply = self.model.reply(self.instructions, self.history)
-        if reply is None:
-            return "Sorry, I can't answer that right now. Please try again."
-        return reply
 
     def needs_human(self, text):
         """Check if a store associate is needed."""
@@ -50,12 +42,35 @@ class FashionHelper:
                 return True
         return False
 
-    def stock_reply(self, user_message):
-        """Use the inventory tool to check availability."""
-        item = self.fashion_inventory.find_item(user_message)
+    def model_reply(self):
+        """Ask the model and run checked tools up to a limit."""
+        rounds = 0
 
-        if item is None:
-            return "Which item? I can check heels, dresses, handbags, or jackets."
+        while rounds < MAX_TOOL_ROUNDS:
+            tool_list = self.tools.tool_list()
 
-        stock = self.fashion_inventory.stock_for(item)
-        return f"Stock for {item}: {stock}."
+            decision = self.model.decide(self.instructions, self.history, tool_list)
+
+            if decision is None:
+                return "Sorry, I can't answer that right now. Please try again."
+
+            if "text" in decision:
+                return decision["text"]
+
+            name = decision["tool"]
+            arguments = decision["arguments"]
+
+            result = self.tools.run(name, arguments, self.history)
+
+            self.history.append(
+                {
+                    "role": "tool",
+                    "tool_name": name,
+                    "arguments": arguments,
+                    "content": result,
+                }
+            )
+
+            rounds += 1
+
+        return "Sorry, I couldn't finish that. Please speak to a store associate."
